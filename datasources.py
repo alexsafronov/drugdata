@@ -3,7 +3,11 @@
 import ast, sys, json, os, re
 from datetime import datetime
 # label_data_path = r"C:\Users\as23i485\Documents\additional_data\openfda_labels\JSON"
+from operator import itemgetter
+from urllib.request import urlopen
+
 label_data_path = None
+
 
 def config(fn) :
     config_data = json.load(open(fn, "r"))
@@ -80,6 +84,142 @@ def get_FDA_label_list(max_json_file_count=None, max_sample_size_per_json_src=No
     sys.stderr.flush()
     return(res)
 
-def count_label_data() :
-    print(label_data_path)
+def extract_ct_data_from_json_subfolder(folder_name) :
+    print(folder_name)
+    exit()
+    path_to_json_files = "C:/Users/as23i485/Documents/CT.gov_ALL_ZIP/AllAPIJSON/" + folder_name
+    json_file_names = [filename for filename in os.listdir(path_to_json_files) if filename.endswith('.json')]
+    multiple_study_objects = []
+    for counter, json_file_name in enumerate(json_file_names):
+        with open(os.path.join(path_to_json_files, json_file_name), encoding="utf-8") as json_file:
+            study_object = {}
+            study_object['n_items'] = 0
+            json_obj = json.load(json_file)
+            
+            ProtocolSection = json_obj['FullStudy']['Study']['ProtocolSection']
+            Study  = json_obj['FullStudy']['Study']
+            # for key in list(ProtocolSection.keys()):
+            #    if key == 'OutcomeMeasuresModule': print (j, key)
+            
+            IdentificationModule = json_obj['FullStudy']['Study']['ProtocolSection']['IdentificationModule']
+
+            study_object['NCTId'] = IdentificationModule['NCTId']
+            study_object['IsADrug'] = False
+            study_object['InterventionType'] = ""
+            study_object['StatusModule'] = {}
+            study_object['OriginalStudyId'] = ""
+            study_object['PhaseList'] = []
+
+            study_object.update({'outcome_measure_type': "", 'outcome_measure_desc': "", 'primary_outcome_1': ""})
+            ResultsSection = Study.get('ResultsSection', False)
+            if ResultsSection :
+                OutcomeMeasuresModule =  ResultsSection.get('OutcomeMeasuresModule', False)
+                if OutcomeMeasuresModule :
+                    # if OutcomeMeasuresModule.get('OutcomeMeasuresModule', False):
+                    # print(j, OutcomeMeasuresModule)
+                    outcome_measure_type      = OutcomeMeasuresModule['OutcomeMeasureList']['OutcomeMeasure'][0]['OutcomeMeasureType']
+                    outcome_measure_desc      = OutcomeMeasuresModule['OutcomeMeasureList']['OutcomeMeasure'][0].get('OutcomeMeasureDescription', "")
+                    study_object['outcome_measure_type'] = outcome_measure_type
+                    study_object['outcome_measure_desc'] = outcome_measure_desc
+                    
+            study_object['LeadSponsorName'] = ""
+            study_object['LeadSponsorClass'] = ""
+            if ProtocolSection.get('SponsorCollaboratorsModule') :
+                SponsorCollaboratorsModule   = ProtocolSection['SponsorCollaboratorsModule']
+                if SponsorCollaboratorsModule.get('LeadSponsor') :
+                    LeadSponsor = SponsorCollaboratorsModule['LeadSponsor']
+                    study_object['LeadSponsorName'] = LeadSponsor.get('LeadSponsorName')
+                    study_object['LeadSponsorClass'] = LeadSponsor.get('LeadSponsorClass')
+
+            if ProtocolSection.get('OutcomesModule'):
+                OutcomesModule   = ProtocolSection['OutcomesModule']
+                if OutcomesModule.get('PrimaryOutcomeList') :
+                    primary_outcome_list   = OutcomesModule['PrimaryOutcomeList']['PrimaryOutcome']
+                study_object['primary_outcome_1'] = primary_outcome_list[0].get('PrimaryOutcomeDescription')
+                
+            if IdentificationModule.get('OrgStudyIdInfo'):
+                OrgStudyIdInfo = IdentificationModule['OrgStudyIdInfo']
+                if OrgStudyIdInfo.get('OrgStudyId'):
+                    study_object['OriginalStudyId'] = OrgStudyIdInfo['OrgStudyId']
+                study_object['OrgStudyIdInfo'] = OrgStudyIdInfo
+                
+            if ProtocolSection.get('DesignModule'):
+                DesignModule = ProtocolSection['DesignModule']
+                if DesignModule.get('PhaseList') :
+                    PhaseList  = ProtocolSection['DesignModule']['PhaseList']
+                    study_object['PhaseList'] = (PhaseList['Phase'])
+                    
+            if ProtocolSection.get('StatusModule'):
+                study_object['StatusModule'] = ProtocolSection['StatusModule']
+                    
+            study_object['IsADrug'] = False
+            study_object['InterventionNames'] = []
+            study_object['InterventionOtherNames'] = []
+            study_object['ArmGroupInterventionNames'] = []
+            study_object['ConditionMeshTerms'] = []
+            if ProtocolSection.get('ConditionsModule') : # ArmsInterventionsModule.get('ArmGroupList'):
+                ConditionsModule = ProtocolSection['ConditionsModule']
+                if ConditionsModule.get('ConditionList') :
+                    for cond in ConditionsModule['ConditionList']['Condition'] :
+                        study_object['ConditionMeshTerms'].append(cond)
+                if ConditionsModule.get('KeywordList') :
+                    for cond in ConditionsModule['KeywordList']['Keyword'] :
+                        study_object['ConditionMeshTerms'].append(cond)
+            if ProtocolSection.get('ArmsInterventionsModule') : # ArmsInterventionsModule.get('ArmGroupList'):
+                ArmsInterventionsModule = ProtocolSection['ArmsInterventionsModule']
+                if ArmsInterventionsModule.get('InterventionList') :
+                    i_list  = ArmsInterventionsModule['InterventionList']['Intervention']
+                    study_object['InterventionList'] = i_list
+                    study_object['n_items'] = len(i_list)
+                    for item in i_list :
+                        InterventionName = item.get('InterventionName')
+                        
+                        study_object['InterventionNames'].append(str(InterventionName))
+                        if item.get('InterventionOtherNameList') :
+                            Intervention_Other_Name_List = item.get('InterventionOtherNameList')
+                            # TODO: To assert that there only one other name in the list for each arm :
+                            other_inter_name = Intervention_Other_Name_List['InterventionOtherName'][0]
+                            study_object['InterventionOtherNames'].append(str(other_inter_name))
+                        if item['InterventionType'] == "Drug" :
+                            study_object['IsADrug'] = True
+                        study_object['InterventionType'] = item['InterventionType']
+                if ArmsInterventionsModule.get('ArmGroupList') :
+                    ArmGroupList = ArmsInterventionsModule['ArmGroupList']
+                    if ArmGroupList.get('ArmGroup') :
+                        for item in ArmsInterventionsModule['ArmGroupList']['ArmGroup'] :
+                            if item.get('ArmGroupInterventionList') :
+                                for sub_item in item['ArmGroupInterventionList']['ArmGroupInterventionName'] :
+                                    study_object['ArmGroupInterventionNames'].append(sub_item)
+            ######################################################
+            DerivedSection  = json_obj['FullStudy']['Study']['DerivedSection']
+            study_object['InterventionMeshTerms'] = []
+            if DerivedSection.get('InterventionBrowseModule') :
+                InterventionBrowseModule = DerivedSection.get('InterventionBrowseModule')
+                if InterventionBrowseModule.get('InterventionMeshList') :
+                    i_mesh_list  = InterventionBrowseModule['InterventionMeshList']['InterventionMesh']
+                    study_object['InterventionMeshList'] = i_mesh_list
+                    for item in i_mesh_list :
+                        InterventionMeshTerm = item.get('InterventionMeshTerm')
+                        study_object['InterventionMeshTerms'].append(str(InterventionMeshTerm))
+                        
+            if DerivedSection.get('ConditionBrowseModule') :
+                ConditionBrowseModule = DerivedSection.get('ConditionBrowseModule')
+                if ConditionBrowseModule.get('ConditionMeshList') :
+                    c_mesh_list  = ConditionBrowseModule['ConditionMeshList']['ConditionMesh']
+                    study_object['ConditionMeshList'] = c_mesh_list
+                    for item in c_mesh_list :
+                        ConditionMeshTerm = item.get('ConditionMeshTerm')
+                        study_object['ConditionMeshTerms'].append(str(ConditionMeshTerm))
+            #############################################
+            # if "NCT013127" in study_object['NCTId'] : print(study_object['NCTId'], study_object['InterventionType'])
+            if True or study_object['IsADrug'] :
+                filtered_study_object = dict((k, study_object[k]) for k in [
+                    'NCTId', 'IsADrug', 'OriginalStudyId', 'InterventionNames', 'ArmGroupInterventionNames'
+                    , 'InterventionOtherNames', 'StatusModule', 'PhaseList'
+                    , 'outcome_measure_type', 'outcome_measure_desc', 'primary_outcome_1'
+                    , 'LeadSponsorName', 'LeadSponsorClass'
+                    , 'InterventionMeshTerms', 'ConditionMeshTerms'
+                    ])
+                multiple_study_objects.append(filtered_study_object)
+    return(multiple_study_objects)
 
