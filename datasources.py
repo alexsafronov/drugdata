@@ -12,11 +12,13 @@ label_data_path = None
 def config(fn) :
     config_data = json.load(open(fn, "r"))
     global label_data_path
+    global ct_data_path
     if config_data.get('base_path') :
         label_data_path = os.path.join(config_data['base_path'], config_data['label_data_path'])
+        ct_data_path    = os.path.join(config_data['base_path'], config_data['ct_data_path'])
     else :
         label_data_path = config_data['label_data_path']
-
+        ct_data_path    = config_data['ct_data_path']
 
 # Labels
 # 
@@ -84,11 +86,16 @@ def get_FDA_label_list(max_json_file_count=None, max_sample_size_per_json_src=No
     sys.stderr.flush()
     return(res)
 
-def extract_ct_data_from_json_subfolder(folder_name) :
-    print(folder_name)
-    exit()
-    path_to_json_files = "C:/Users/as23i485/Documents/CT.gov_ALL_ZIP/AllAPIJSON/" + folder_name
-    json_file_names = [filename for filename in os.listdir(path_to_json_files) if filename.endswith('.json')]
+def extract_ct_data_from_json_subfolder(subfolder_name, max_file_count=None) :
+    
+    path_to_json_files = os.path.join(ct_data_path, subfolder_name) #  ct_data_path + subfolder_name
+    if max_file_count :
+        json_file_names = [filename for filename in os.listdir(path_to_json_files) if filename.endswith('.json')][0:max_file_count]
+    else :
+        json_file_names = [filename for filename in os.listdir(path_to_json_files) if filename.endswith('.json')]
+    
+    print(f"json_file_names length = {len(json_file_names)}")
+
     multiple_study_objects = []
     for counter, json_file_name in enumerate(json_file_names):
         with open(os.path.join(path_to_json_files, json_file_name), encoding="utf-8") as json_file:
@@ -223,3 +230,4 @@ def extract_ct_data_from_json_subfolder(folder_name) :
                 multiple_study_objects.append(filtered_study_object)
     return(multiple_study_objects)
 
+def extract_ct_data_from_json_overfolder(overfolder_name, max_folder_count=None, max_file_count=None) :
