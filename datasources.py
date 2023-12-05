@@ -94,7 +94,7 @@ def extract_ct_data_from_json_subfolder(subfolder_name, max_file_count=None) :
     else :
         json_file_names = [filename for filename in os.listdir(path_to_json_files) if filename.endswith('.json')]
     
-    print(f"json_file_names length = {len(json_file_names)}")
+    # print(f"json_file_names length = {len(json_file_names)}")
 
     multiple_study_objects = []
     for counter, json_file_name in enumerate(json_file_names):
@@ -230,4 +230,57 @@ def extract_ct_data_from_json_subfolder(subfolder_name, max_file_count=None) :
                 multiple_study_objects.append(filtered_study_object)
     return(multiple_study_objects)
 
-def extract_ct_data_from_json_overfolder(overfolder_name, max_folder_count=None, max_file_count=None) :
+# The data extracted from CT.gov, after unzipping, comes in subfolders named NCT####xxxx, where #### are four digits from 0000 to 0596.
+# It returns False iff there are not enough 
+def extract_ct_data_from_stack_of_json_subfolders(folder_step_idx, folder_step_size=10, max_folder_count=None, max_file_count_per_subfolder=None, out_folder='.') :
+    folder_list = []
+    i = 0
+    list_of_all_dir_items = os.listdir(ct_data_path)
+    dir_item_count = len(list_of_all_dir_items)
+    
+    if dir_item_count <= folder_step_idx * folder_step_size :
+        return(False)
+        
+    for file_path in list_of_all_dir_items:
+        if (folder_step_idx) * folder_step_size <= i and i <  (folder_step_idx + 1) * folder_step_size :
+            # print(file_path)
+            if os.path.isdir(os.path.join(ct_data_path, file_path)):
+                folder_list.append(file_path)
+        i += 1
+
+    sys.stderr.write("A total of " + str(len(folder_list)) + " folders. ")
+    fn = "CT_" + str(folder_step_idx).zfill(3) + ".json"
+    file_to_output = open(os.path.join(out_folder, fn), "w", encoding="utf-8")
+    
+    multiple_study_objects = []
+    for n, file_path in enumerate(folder_list) :
+        if n % 100 == 0 :
+            sys.stderr.write("Cur. time = " +datetime.now().strftime("%H:%M:%S") + ". Folder count x 10 : ")
+        if n % 10 == 0 :
+            sys.stderr.write(str(n // 10) + "")
+            sys.stderr.flush()
+            sys.stdout.flush()
+        elif n % 1 == 0 :
+            sys.stderr.write(".")
+            sys.stderr.flush()
+        # print(file_path)
+        multiple_study_objects.extend(extract_ct_data_from_json_subfolder(file_path, max_file_count_per_subfolder)) 
+    sys.stderr.write("\n")
+
+    '''
+    json_to_report = {}
+    json_to_report['timesamp'] = str(datetime.now())
+    json_to_report['program'] = "extract_ct_info_from_json.py"
+    json_to_report['StudyInfo'] = multiple_study_objects
+    file_to_output.write(json.dumps(json_to_report))
+    '''
+    
+    json.dump(multiple_study_objects, file_to_output)
+    return(True)
+
+def extract_ct_data_from_all_stacks_of_json_subfolders(folder_step_size=10, max_folder_count=None, max_file_count_per_subfolder=None, out_folder='.') :
+    folder_step_idx = 0
+    while extract_ct_data_from_stack_of_json_subfolders(folder_step_idx, folder_step_size=10, out_folder="./ct_out", max_file_count_per_subfolder=1) :
+        folder_step_idx += 1
+
+
