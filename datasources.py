@@ -13,9 +13,12 @@ def config(fn) :
     config_data = json.load(open(fn, "r"))
     global label_data_path
     global ct_data_path
+    global staging_path
+    staging_path = "."
     if config_data.get('base_path') :
         label_data_path = os.path.join(config_data['base_path'], config_data['label_data_path'])
         ct_data_path    = os.path.join(config_data['base_path'], config_data['ct_data_path'])
+        staging_path    = os.path.join(config_data['base_path'], config_data['staging_dir'])
     else :
         label_data_path = config_data['label_data_path']
         ct_data_path    = config_data['ct_data_path']
