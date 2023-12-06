@@ -11,17 +11,29 @@ label_data_path = None
 
 def config(fn) :
     config_data = json.load(open(fn, "r"))
-    global label_data_path
-    global ct_data_path
+    
+    global ctinversion_interventions_fn
+    ctinversion_interventions_fn    = config_data['ctinversion_interventions_fn']
+    
     global staging_path
     staging_path = "."
+    
     if config_data.get('base_path') :
+    
+        global label_data_path
         label_data_path = os.path.join(config_data['base_path'], config_data['label_data_path'])
+        
+        global ct_data_path
         ct_data_path    = os.path.join(config_data['base_path'], config_data['ct_data_path'])
+        
+        global ct_data_path_extracted
+        ct_data_path_extracted    = os.path.join(config_data['base_path'], config_data['ct_data_path_extracted'])
+        
         staging_path    = os.path.join(config_data['base_path'], config_data['staging_dir'])
     else :
         label_data_path = config_data['label_data_path']
         ct_data_path    = config_data['ct_data_path']
+        ct_data_path_extracted    = config_data['ct_data_path_extracted']
 
 # Labels
 # 
