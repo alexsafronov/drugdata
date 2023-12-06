@@ -12,9 +12,8 @@ import datasources as ds
 
 # ct_json_dir_path = ds.ct_data_path_extracted # "C:/Users/as23i485/Documents/CT.gov_py_scripts/JSON/"
 
-def get_NCT_list(output_fn = "sorted_internames_SAMPLE.json", large_json_slicing_limits=(None, None)) :
+def get_NCT_list_for_interventions(large_json_slicing_limits=(None, None)) :
     i = 0
-    file_list = []
     res = []
     k = 0
     max_length = 0
@@ -22,7 +21,6 @@ def get_NCT_list(output_fn = "sorted_internames_SAMPLE.json", large_json_slicing
         # check if current file_path is a file
         if os.path.isfile(os.path.join(ds.ct_data_path_extracted, file_path)):
             # add filename to list
-            file_list.append(file_path)
             file_handle = open(os.path.join(ds.ct_data_path_extracted, file_path))
             file_data = json.load(file_handle)
             study_data = file_data['StudyInfo']
@@ -51,19 +49,37 @@ def get_NCT_list(output_fn = "sorted_internames_SAMPLE.json", large_json_slicing
         sys.stderr.write(".")
         sys.stderr.flush()
     return(res)
-# applicaiton_list = get_FDA_list(fda_json_dir_path)
 
-'''
-output_fn = "drug_list_SAMPLE.json"
-json.dump(drug_list, open(output_fn, "w"))
-'''
+def get_NCT_list_for_indications(large_json_slicing_limits=(None, None)) :
+    i = 0
+    res = []
+    k = 0
+    max_length = 0
+    for file_path in os.listdir(ds.ct_data_path_extracted)[large_json_slicing_limits[0]: large_json_slicing_limits[1]]:
+        if os.path.isfile(os.path.join(ds.ct_data_path_extracted, file_path)):
+            file_handle = open(os.path.join(ds.ct_data_path_extracted, file_path))
+            file_data = json.load(file_handle)
+            study_data = file_data['StudyInfo']
+            for one_study_info in study_data:
+                i += 1
+                all_indic_mesh_names = one_study_info['ConditionMeshTerms']
+                for i_name in all_indic_mesh_names :
+                    one_entry = {}
+                    one_entry['NCTId'] = one_study_info['NCTId']
+                    one_entry['PhaseList'] = one_study_info['PhaseList']
+                    one_entry['IndicationName'] = i_name.upper()
+                    res.append(one_entry)
+                    k += 1
+        sys.stderr.write(".")
+        sys.stderr.flush()
+    return(res)
 
 def create_sorted_internames(large_json_slicing_limits=(None, None)) :
     
     back_hash = {}
     printable = set(string.printable)
     
-    drug_list = get_NCT_list(large_json_slicing_limits=large_json_slicing_limits)
+    drug_list = get_NCT_list_for_interventions(large_json_slicing_limits=large_json_slicing_limits)
     print("\nNow iterating over the CT intervention list. A total of " + str(len(drug_list)) +
     " intervention names to be checked, starting now.")
     
@@ -113,3 +129,5 @@ def create_sorted_internames(large_json_slicing_limits=(None, None)) :
     json.dump(sorted_back_list, output_fh)
     print(f"Function cti.create_sorted_internames() output data to {full_out_fn}.")
 
+def create_sorted_indicnames(large_json_slicing_limits=(None, None)) :
+    pass
