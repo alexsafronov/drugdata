@@ -7,12 +7,23 @@ from datetime import datetime
 import string
 import datasources as ds
 
-
+# USAGE :
+#    Large_json_slicing_limits.
+#    Explanation: the CT data is extracted from the original database
+#    with one json file per study by extracting only the fields of interest and repackaging them all in a few
+#    json files. This is done for performance reasons. The total resulting files comes about fifty-nine json files.
+#    So, if you want to only load a small portion of the data, then
+#    the large_json_slicing_limits should be a 2-tuple with lower and upper limits from 0 to 60.
+#    
+#    slicing_limits_inside_json.
+#    Explanation: These limits allow subselect studies witin the json file. For example, if one json file has more
+#    data than you want, you can slicing_limits_inside_json in order to do further selection.
+#    
 # create_sorted_internames.py :
 
 # ct_json_dir_path = ds.ct_data_path_extracted # "C:/Users/as23i485/Documents/CT.gov_py_scripts/JSON/"
 
-def get_NCT_list_for_interventions(large_json_slicing_limits=(None, None)) :
+def get_NCT_list_for_interventions(large_json_slicing_limits=(None, None), slicing_limits_inside_json=(None, None)) :
     i = 0
     res = []
     k = 0
@@ -24,7 +35,7 @@ def get_NCT_list_for_interventions(large_json_slicing_limits=(None, None)) :
             file_handle = open(os.path.join(ds.ct_data_path_extracted, file_path))
             file_data = json.load(file_handle)
             study_data = file_data['StudyInfo']
-            for one_study_info in study_data:
+            for one_study_info in study_data[slicing_limits_inside_json[0]: slicing_limits_inside_json[1]]:
                 i += 1
                 all_inter_names = one_study_info['InterventionNames'] + one_study_info['ArmGroupInterventionNames'] + one_study_info['InterventionOtherNames']
                 # all_inter_names = one_study_info['InterventionNames']
@@ -50,7 +61,7 @@ def get_NCT_list_for_interventions(large_json_slicing_limits=(None, None)) :
         sys.stderr.flush()
     return(res)
 
-def get_NCT_list_for_indications(large_json_slicing_limits=(None, None)) :
+def get_NCT_list_for_indications(large_json_slicing_limits=(None, None), slicing_limits_inside_json=(None, None)) :
     i = 0
     res = []
     k = 0
@@ -60,7 +71,7 @@ def get_NCT_list_for_indications(large_json_slicing_limits=(None, None)) :
             file_handle = open(os.path.join(ds.ct_data_path_extracted, file_path))
             file_data = json.load(file_handle)
             study_data = file_data['StudyInfo']
-            for one_study_info in study_data:
+            for one_study_info in study_data[slicing_limits_inside_json[0]: slicing_limits_inside_json[1]]:
                 i += 1
                 all_indic_mesh_names = one_study_info['ConditionMeshTerms']
                 for i_name in all_indic_mesh_names :
@@ -74,7 +85,7 @@ def get_NCT_list_for_indications(large_json_slicing_limits=(None, None)) :
         sys.stderr.flush()
     return(res)
 
-def create_sorted_internames(large_json_slicing_limits=(None, None)) :
+def create_sorted_internames(large_json_slicing_limits=(None, None), slicing_limits_inside_json=(None, None)) :
     
     back_hash = {}
     printable = set(string.printable)
@@ -125,9 +136,50 @@ def create_sorted_internames(large_json_slicing_limits=(None, None)) :
 
     sorted_back_list = sorted(back_list, key=lambda x: x[0])
     full_out_fn = os.path.join(ds.staging_path, ds.ctinversion_interventions_fn)
-    output_fh = open(full_out_fn, "w") 
+    output_fh = open(full_out_fn, "w")
     json.dump(sorted_back_list, output_fh)
     print(f"Function cti.create_sorted_internames() output data to {full_out_fn}.")
 
-def create_sorted_indicnames(large_json_slicing_limits=(None, None)) :
-    pass
+
+def create_sorted_indicnames(large_json_slicing_limits=(None, None), slicing_limits_inside_json=(None, None)) :
+
+    i_list = get_NCT_list_for_indications(large_json_slicing_limits=large_json_slicing_limits, slicing_limits_inside_json=slicing_limits_inside_json)
+    
+    print("\nNow iterating over the CT indication list. A total of " + str(len(i_list)) +
+    " indication names to be checked, starting now.")
+    
+    back_hash = {}
+    printable = set(string.printable)
+    
+    for counter, study in enumerate(i_list) :
+        if counter % 1000 == 0 :
+            sys.stderr.write(".")
+        if counter % 10000 == 0 :
+            sys.stderr.write(" " + str(counter) + " ")
+        if counter % 100000 == 0 : sys.stderr.write(" Cur Time = " + str(datetime.now())[0:19] + "   " + "\n")
+        sys.stderr.flush()
+        
+        NCTId     = study['NCTId']
+        i_name = ''.join(filter(lambda x: x in printable, study['IndicationName']))
+        PhaseList = study['PhaseList']
+        to_append = {'NCTId' : NCTId, 'PhaseList' : PhaseList}
+        if back_hash.get(i_name):
+            back_hash[i_name].append(to_append)
+        else:
+            back_hash[i_name] = [to_append]
+            
+    print("\n")
+    back_list = []
+    for i_name in back_hash :
+        # back_hash[i_name] = sorted(list(set(back_hash[i_name])))
+        # srt = sorted(list(set(back_hash[i_name])), key=lambda x: x['NCTId'])
+        # srt = set(back_hash[i_name])
+        srt = list({v['NCTId']:v for v in back_hash[i_name]}.values()) # deduped list of studies
+        pair = (i_name, srt)
+        back_list.append(pair)
+        
+    sorted_back_list = sorted(back_list, key=lambda x: x[0])
+    full_out_fn = os.path.join(ds.staging_path, ds.ctinversion_indications_fn)
+    output_fh = open(full_out_fn, "w") 
+    json.dump(sorted_back_list, output_fh)
+    print(f"Function cti.create_sorted_indicnames() output data to {full_out_fn}.")

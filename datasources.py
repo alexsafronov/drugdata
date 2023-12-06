@@ -15,6 +15,9 @@ def config(fn) :
     global ctinversion_interventions_fn
     ctinversion_interventions_fn    = config_data['ctinversion_interventions_fn']
     
+    global ctinversion_indications_fn
+    ctinversion_indications_fn    = config_data['ctinversion_indications_fn']
+    
     global staging_path
     staging_path = "."
     
