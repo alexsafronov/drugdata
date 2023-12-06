@@ -1,4 +1,6 @@
-# This change was done on 2023 12 05 0015
+# PURPOSE: This module is focused on extraction of data from the original sources.
+# AUTHOR: Alex Safronov
+# DATE FIRST CREATED: 2023 12 04
 
 import ast, sys, json, os, re
 from datetime import datetime
@@ -33,17 +35,15 @@ def config(fn) :
         ct_data_path_extracted    = os.path.join(config_data['base_path'], config_data['ct_data_path_extracted'])
         
         staging_path    = os.path.join(config_data['base_path'], config_data['staging_dir'])
+        
+        global emtree_indic_data_path_fn
+        emtree_indic_data_path_fn    = os.path.join(config_data['base_path'], config_data['emtree_indic_data_path_fn'])
     else :
         label_data_path = config_data['label_data_path']
         ct_data_path    = config_data['ct_data_path']
         ct_data_path_extracted    = config_data['ct_data_path_extracted']
+        emtree_indic_data_path_fn    = config_data['emtree_indic_data_path_fn']
 
-# Labels
-# 
-# Labels
-# Labels
-# Labels
-# Labels
 
 # Labels
 # Application number is extracted from 'openfda' section under the field name 'application_number' :
@@ -283,16 +283,8 @@ def extract_ct_data_from_stack_of_json_subfolders(folder_step_idx, folder_step_s
             sys.stderr.flush()
         # print(file_path)
         multiple_study_objects.extend(extract_ct_data_from_json_subfolder(file_path, max_file_count_per_subfolder)) 
-    sys.stderr.write("\n")
-
-    '''
-    json_to_report = {}
-    json_to_report['timesamp'] = str(datetime.now())
-    json_to_report['program'] = "extract_ct_info_from_json.py"
-    json_to_report['StudyInfo'] = multiple_study_objects
-    file_to_output.write(json.dumps(json_to_report))
-    '''
     
+    sys.stderr.write("\n")
     json.dump(multiple_study_objects, file_to_output)
     return(True)
 
@@ -300,5 +292,69 @@ def extract_ct_data_from_all_stacks_of_json_subfolders(folder_step_size=10, max_
     folder_step_idx = 0
     while extract_ct_data_from_stack_of_json_subfolders(folder_step_idx, folder_step_size=10, out_folder="./ct_out", max_file_count_per_subfolder=1) :
         folder_step_idx += 1
+
+
+def extract_emtree_diseases_and_dedup() :
+    file = open(emtree_indic_data_path_fn, "r")
+    data = file.readlines()
+    file.close()
+
+
+    id_list = [];
+    str_list = [];
+    node_list = [];
+    for counter, item in enumerate(data):
+        str_list.append(item.replace("\n",""))
+    sys.stderr.write("\nExtracting the data from the raw emtree file: " + emtree_indic_data_path_fn + "\n")
+    sys.stderr.write("\nNew List items: " + str(len(str_list)) + "\n")
+    sys.stderr.flush()
+
+    # for counter, item in enumerate(str_list[75860:75869]):
+    for counter, item in enumerate(str_list):
+        if item == "" : continue
+        if counter % 1000 == 0 :
+            sys.stderr.write(".")
+        if counter % 10000 == 0 :
+            sys.stderr.write(" " + str(counter) + " ")
+        sys.stderr.flush()
+        single_node = ast.literal_eval(item)
+        node_id = single_node[0][0]
+        id_list.append(node_id)
+        if len(single_node) < 5 : single_node.append([])
+        node_item = {
+             'node_id'  : single_node[0][0]
+            ,'term'     : single_node[1][0]
+            ,'synonyms' : single_node[2]
+            ,'parent'   : single_node[3][0]
+            ,'children' : single_node[4]
+        }
+        node_list.append(node_item)
+    print("\ntotal  items: ", len(id_list), flush=True)
+    print("unique items: ", len(set(id_list)), flush=True)
+    print("Now deduplicating the emtree diseases.", flush=True)
+    
+    terms = []
+    for item in node_list :
+        terms.append(item['term'])
+        
+    unique_terms = set(terms)
+    unique_nodes = []
+    print("Total node count = ", len(node_list), flush=True)
+    print("Output of nodes with unique terms. Total unique terms: ", len(unique_terms), ". Now counting unique terms:", flush=True)
+    for counter, unique_term in enumerate(sorted(unique_terms)) :
+        if counter % 5000 == 0 :
+            sys.stderr.write(" " + str(counter) + " ")
+            sys.stderr.flush()
+        elif counter % 1000 == 0 :
+            sys.stderr.write(".")
+            sys.stderr.flush()
+        for node in node_list :
+            if node['term'] == unique_term :
+                unique_nodes.append({'term':node['term'], 'synonyms':node['synonyms']})
+                break
+    print("", flush=True)
+    print("total node count from original emtree: ", len(node_list), "", flush=True)
+    print("total node count from deduped emtree : ", len(unique_nodes), "", flush=True)
+    return(unique_nodes)
 
 
