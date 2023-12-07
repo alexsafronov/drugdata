@@ -2,7 +2,7 @@
 # AUTHOR: Alex Safronov
 # DATE FIRST CREATED: 2023 12 04
 
-import ast, sys, json, os, re
+import ast, sys, json, os, re, chardet
 from datetime import datetime
 # label_data_path = r"C:\Users\as23i485\Documents\additional_data\openfda_labels\JSON"
 from operator import itemgetter
@@ -41,12 +41,16 @@ def config(fn) :
         
         global emtree_inter_data_path_fn
         emtree_inter_data_path_fn    = os.path.join(config_data['base_path'], config_data['emtree_inter_data_path_fn'])
+        
+        global fda_raw_master_data_path
+        fda_raw_master_data_path    = os.path.join(config_data['base_path'], config_data['fda_raw_master_data_path'])
     else :
         label_data_path = config_data['label_data_path']
         ct_data_path    = config_data['ct_data_path']
         ct_data_path_extracted    = config_data['ct_data_path_extracted']
         emtree_indic_data_path_fn    = config_data['emtree_indic_data_path_fn']
         emtree_inter_data_path_fn    = config_data['emtree_inter_data_path_fn']
+        fda_raw_master_data_path     = config_data['fda_raw_master_data_path']
 
 
 # Labels
@@ -292,9 +296,9 @@ def extract_ct_data_from_stack_of_json_subfolders(folder_step_idx, folder_step_s
     json.dump(multiple_study_objects, file_to_output)
     return(True)
 
-def extract_ct_data_from_all_stacks_of_json_subfolders(folder_step_size=10, max_folder_count=None, max_file_count_per_subfolder=None, out_folder='.') :
+def extract_ct_data_from_all_stacks_of_json_subfolders(folder_step_size=10, max_folder_count=None, max_file_count_per_subfolder=None, out_folder=".") :
     folder_step_idx = 0
-    while extract_ct_data_from_stack_of_json_subfolders(folder_step_idx, folder_step_size=10, out_folder="./ct_out", max_file_count_per_subfolder=1) :
+    while extract_ct_data_from_stack_of_json_subfolders(folder_step_idx, folder_step_size=10, out_folder=out_folder, max_file_count_per_subfolder=1) :
         folder_step_idx += 1
 
 
@@ -361,6 +365,7 @@ def extract_emtree_diseases_and_dedup() :
     return(unique_nodes)
 
 
+# PoC: read_emtree_into_json.py
 def extract_emtree_drugs_and_dedup() :
     file = open(emtree_inter_data_path_fn, "r")
     data = file.readlines()
@@ -422,3 +427,135 @@ def extract_emtree_drugs_and_dedup() :
     print("total node count from original emtree: ", len(node_list), "", flush=True)
     print("total node count from deduped emtree : ", len(unique_nodes), "", flush=True)
     return(unique_nodes)
+
+
+
+########################################################################
+#   PoC:    load_fda_applic_from_raw_folder_to_json.py
+########################################################################
+
+def encoding(full_path) :
+        rawdata = open(full_path, 'rb').read()
+        result = chardet.detect(rawdata)
+        return (result['encoding'])
+
+def add_application_basic_data(data_to_return, raw_html) :
+
+    application_data = { "Application Requested Number" : '', 'Application Extracted Number' : '' }
+
+    # Extracting data from the first subtitle
+    regex_to_extract_data_from_first_subtitle = '<span style="font-size:1.1em"><span class="prodBoldText"><strong>([^<]*)</strong>:</span> <span class="appl-details-top">([^<]*)</span>'
+    matches_for_first_subtitle = re.findall(regex_to_extract_data_from_first_subtitle, raw_html, re.DOTALL)
+    application_data['Application Type'], application_data['Application Extracted Number'] = matches_for_first_subtitle[0]
+    # TODO: To remove the following assignment
+    application_data['Application Requested Number'] = application_data['Application Extracted Number']
+    data_to_return['meta']['Columns']['Application Requested Number'] = "application_data['Application Requested Number'] = application_data['Application Extracted Number']"
+    
+    
+    # Extracting data from the second subtitle
+    regex_to_extract_data_from_second_subtitle = '<span class="prodBoldText">Company:</span> <span class="appl-details-top">([^<]*)</span>'
+    matches_for_second_subtitle = re.findall(regex_to_extract_data_from_second_subtitle, raw_html, re.DOTALL)
+    application_data['Company'] = matches_for_second_subtitle[0].strip()
+
+
+    ####################################
+    # Extracting data from the first HTML table
+    ####################################
+
+    regex_to_extract_data_from_first_table_1 = '<tr class="prodBoldText">\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>'
+    regex_to_extract_data_from_first_table_2 = '<tr class="prodBoldText">\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>\s*<span style="white-space:wrap">([^<]*)</span>\s*</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>'
+    # TODO: To try and implement the second regex:  regex_to_extract_data_from_first_table_2, so the spans match too
+    matches_for_first_table_1 = re.findall(regex_to_extract_data_from_first_table_1, raw_html, re.DOTALL)
+    matches_for_first_table_2 = re.findall(regex_to_extract_data_from_first_table_2, raw_html, re.DOTALL)
+    if   matches_for_first_table_1 :
+        the_first_extracted_tuple = matches_for_first_table_1[0] # TODO: I may want to assert that there is only one element in this list (!)
+        keys_for_the_first_extracted_tuple = ("Drug Name", "Active Ingredients", "Strength", "Dosage Form/Route", "Marketing Status", "TE Code", "RLD", "RS")
+        application_data.update(dict(zip(keys_for_the_first_extracted_tuple, the_first_extracted_tuple)))
+    elif matches_for_first_table_2 :
+        the_first_extracted_tuple = matches_for_first_table_2[0] # TODO: I may want to assert that there is only one element in this list (!)
+        keys_for_the_first_extracted_tuple = ("Drug Name", "Active Ingredients", "Strength", "Dosage Form/Route", "Marketing Status", "TE Code", "RLD", "RS")
+        application_data.update(dict(zip(keys_for_the_first_extracted_tuple, the_first_extracted_tuple)))
+    else :
+        print(application_data['Application Requested Number'])
+    
+    ####################################
+    # Second HTML table
+    ####################################
+    
+    # ASSUMPTIONS: So we are assuming that we only have two (2) tr tags with no parameters (ie exactly like <tr>)
+    # Also, keep in mind : the last column (Url) is hidden !
+    regex_to_extract_data_from_second_table = '<tr>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*</tr>'
+    matches_for_second_table= re.findall(regex_to_extract_data_from_second_table, raw_html, re.DOTALL)
+    # Only first list element is the table I need now, so I only consider the first one.
+    if matches_for_second_table :
+        the_second_extracted_tuple = matches_for_second_table[0]
+        # (An assertion must go here)
+        keys_for_the_second_extracted_tuple = ("Action Date", "Submission", "Action Type", "Submission Classification", "Review Priority; Orphan Status", "Letters, Reviews, Labels, Patient Package Insert", "Notes", "Url")
+        application_data.update(dict(zip(keys_for_the_second_extracted_tuple, the_second_extracted_tuple)))
+        application_data["Urls"] = application_data['Url'].split()
+        data_to_return['meta']['Columns']['Urls'] = 'This column is derived from the column Url.'
+
+
+    #for list_elem in matches :
+    #    if list_passed_validation_by_closing_td(list_elem) :
+    # A list of tuple was returned. If any of them has '</td>' then it's a wrong list
+
+    # In the following section I am extracting URLs for the cfm-files.
+    regex_to_match_a_URL = "(https://www.accessdata.fda.gov[^\s\"]+)[\s\"]"
+    matches_for_URLs = re.findall(regex_to_match_a_URL, raw_html, re.DOTALL)
+    application_data["cfm_data"] = []
+    for n, item in enumerate(matches_for_URLs):
+        filename_extension = item.rsplit('.', 30)[-1]
+        if filename_extension == "cfm":
+            #application_data.update({"first_cfm_URL" : item})
+            application_data["cfm_data"].append({"URL" : item})
+    
+    data_to_return['Applications'].append(application_data)
+
+
+def iterate_raw_FDA_master_data(starting_application_number_hundred, out_folder = ".") :
+    source_dir = os.listdir(fda_raw_master_data_path)
+    starting_app_nbr_hun_char = str(starting_application_number_hundred).zfill(2)
+    sys.stderr.write("Starting at appl number " + starting_app_nbr_hun_char +  " x 100 of total "+ str(len(source_dir)) + ". Cur Time = " + str(datetime.now()) + ".     ")
+    application_basic_data = {"meta" : {'Program name' : os. path. basename(__file__), 'Timestamp' : str(datetime.now()), 'Columns' : { }}, "Applications" : [] }
+    small_step = 100
+    big_step = 1000
+    sys.stderr.write(" " + str(small_step) + " x : ")
+    ret = False
+    for n, file_path in enumerate(source_dir):
+        #if 0 and n > 3000  : # or n < int(starting_application_number_hundred) * big_step or n > (int(starting_application_number_hundred) + 1) * big_step - 1 :
+        if n < int(starting_application_number_hundred) * big_step or n > (int(starting_application_number_hundred) + 1) * big_step - 1 :
+            continue
+        if n % small_step == 0 :
+            sys.stderr.write(str(n // small_step) + "")
+            sys.stderr.flush()
+            sys.stdout.flush()
+        elif n % 10 == 0 :
+            sys.stderr.write(".")
+            sys.stderr.flush()
+        full_path = os.path.join(fda_raw_master_data_path, file_path)
+        with open(full_path)  as html_file: #, encoding="utf8") as html_file:
+            raw_html = html_file.read()
+            if encoding(full_path) != "ascii" :
+                continue
+            ret = True
+            add_application_basic_data(application_basic_data, raw_html)
+    fn = "FDA_" + starting_app_nbr_hun_char + ".json"
+    path_fn = os.path.join(out_folder, fn)
+    json_file = open(path_fn, "w")
+    json_file.write(json.dumps(application_basic_data))
+    json_file.close()
+    sys.stderr.write(".\n")
+    return(ret)
+
+
+def extract_FDA_master_data(out_folder=".") :
+    starting_application_number_hundred = 0
+    return_succes = True
+    while return_succes :
+        return_succes = iterate_raw_FDA_master_data(starting_application_number_hundred, out_folder = out_folder)
+        starting_application_number_hundred += 1
+
+
+    
+
