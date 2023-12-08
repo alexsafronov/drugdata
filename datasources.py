@@ -567,7 +567,7 @@ def make_a_random_pause() :
         time.sleep(milliseconds * 1.0 / 1000) 
         #print( str(i).zfill(2) + datetime.utcnow().strftime('%F %T.%f')[:-3] + " " + str(milliseconds) )
 
-def scrap_one_application_from_Drugs_at_FDA(data, ApplNo, alphabetLetter) :
+def scrape_one_application_from_Drugs_at_FDA(data, ApplNo, alphabetLetter) :
     url = 'https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm?event=overview.process&ApplNo=' + ApplNo
     with urlopen( url ) as webpage:
         content = webpage.read().decode()
@@ -638,7 +638,7 @@ def scrap_one_application_from_Drugs_at_FDA(data, ApplNo, alphabetLetter) :
     data['Applications'].append(application_data)
 
 
-def scrap_one_letter_from_Drugs_at_FDA(alphabetLetter, slicing_limits_per_letter=(None, None)) :
+def scrape_one_letter_from_Drugs_at_FDA(alphabetLetter, slicing_limits_per_letter=(None, None)) :
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
     sys.stderr.write(alphabetLetter + " started. Current Time = " + current_time + ".     ")
@@ -659,7 +659,7 @@ def scrap_one_letter_from_Drugs_at_FDA(alphabetLetter, slicing_limits_per_letter
             sys.stderr.write(".")
             sys.stderr.flush()
         make_a_random_pause()
-        scrap_one_application_from_Drugs_at_FDA(application_basic_data, ApplNo, alphabetLetter)
+        scrape_one_application_from_Drugs_at_FDA(application_basic_data, ApplNo, alphabetLetter)
         # if n > 150 :
         #   break
     sys.stderr.write(".\n")
@@ -667,9 +667,9 @@ def scrap_one_letter_from_Drugs_at_FDA(alphabetLetter, slicing_limits_per_letter
     n = json_file.write(json.dumps(application_basic_data))
     json_file.close()
 
-def scrap_whole_alphabet_from_Drugs_at_FDA(slicing_limits_per_letter=(None, None)) :
+def scrape_whole_alphabet_from_Drugs_at_FDA(slicing_limits_per_letter=(None, None)) :
     ascii_code_at_A = 65
     ascii_code_after_Z = 91
     for ascii_code in range(ascii_code_at_A, ascii_code_after_Z):
         alphabetLetter = chr(ascii_code)
-        scrap_one_letter_from_Drugs_at_FDA(alphabetLetter, slicing_limits_per_letter = slicing_limits_per_letter)
+        scrape_one_letter_from_Drugs_at_FDA(alphabetLetter, slicing_limits_per_letter = slicing_limits_per_letter)
