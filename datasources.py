@@ -2,7 +2,7 @@
 # AUTHOR: Alex Safronov
 # DATE FIRST CREATED: 2023 12 04
 
-import ast, sys, json, os, re, chardet
+import ast, sys, json, os, re, chardet, random, time
 from datetime import datetime
 # label_data_path = r"C:\Users\as23i485\Documents\additional_data\openfda_labels\JSON"
 from operator import itemgetter
@@ -43,7 +43,11 @@ def config(fn) :
         emtree_inter_data_path_fn    = os.path.join(config_data['base_path'], config_data['emtree_inter_data_path_fn'])
         
         global fda_raw_master_data_path
-        fda_raw_master_data_path    = os.path.join(config_data['base_path'], config_data['fda_raw_master_data_path'])
+        fda_raw_master_data_path    = os.path.join(config_data['base_path'], config_data['fda_master_appl_data_html_source_path'])
+        # fda_raw_master_data_path    = os.path.join(config_data['base_path'], config_data['ORIGINAL_fda_raw_master_data_path'])
+        
+        global fda_master_appl_data_html_source_path
+        fda_master_appl_data_html_source_path    = os.path.join(config_data['base_path'], config_data['fda_master_appl_data_html_source_path'])
     else :
         label_data_path = config_data['label_data_path']
         ct_data_path    = config_data['ct_data_path']
@@ -556,6 +560,114 @@ def extract_FDA_master_data(out_folder=".") :
         return_succes = iterate_raw_FDA_master_data(starting_application_number_hundred, out_folder = out_folder)
         starting_application_number_hundred += 1
 
+def make_a_random_pause() :
+    average_seconds_to_wait = 3
+    for i in range(average_seconds_to_wait):
+        milliseconds = 2 * random.randint(1, 1000)
+        time.sleep(milliseconds * 1.0 / 1000) 
+        #print( str(i).zfill(2) + datetime.utcnow().strftime('%F %T.%f')[:-3] + " " + str(milliseconds) )
 
+def scrap_one_application_from_Drugs_at_FDA(data, ApplNo, alphabetLetter) :
+    url = 'https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm?event=overview.process&ApplNo=' + ApplNo
+    with urlopen( url ) as webpage:
+        content = webpage.read().decode()
+    text_file_name = os.path.join(fda_master_appl_data_html_source_path, alphabetLetter + "_" + ApplNo + ".txt")
+    text_file = open(text_file_name, "w")
+    n = text_file.write(content)
+    text_file.close()
+
+    application_data = { "Application Requested Number" : ApplNo, 'Application Extracted Number' : '' } # , "cfm_data" : []
+
+    # Extracting data from the first subtitle
+    regex_to_extract_data_from_first_subtitle = '<span style="font-size:1.1em"><span class="prodBoldText"><strong>([^<]*)</strong>:</span> <span class="appl-details-top">([^<]*)</span>'
+    matches_for_first_subtitle = re.findall(regex_to_extract_data_from_first_subtitle, content, re.DOTALL)
+    application_data['Application Type'], application_data['Application Extracted Number'] = matches_for_first_subtitle[0]
     
+    
+    # Extracting data from the second subtitle
+    regex_to_extract_data_from_second_subtitle = '<span class="prodBoldText">Company:</span> <span class="appl-details-top">([^<]*)</span>'
+    matches_for_second_subtitle = re.findall(regex_to_extract_data_from_second_subtitle, content, re.DOTALL)
+    application_data['Company'] = matches_for_second_subtitle[0].strip()
 
+
+    ####################################
+    # Extracting data from the first HTML table
+    ####################################
+
+    regex_to_extract_data_from_first_table = '<tr class="prodBoldText">\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>'
+    regex_to_extract_data_from_first_table_2 = '<tr class="prodBoldText">\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>\s*<td>\s*<span style="white-space:wrap">([^<]*)</span>\s*</td>\s*<td>([^<]*)</td>\s*<td>([^<]*)</td>'
+    # TODO: To try and implement the second regex:  regex_to_extract_data_from_first_table_2, so the spans match too
+    matches_for_first_table = re.findall(regex_to_extract_data_from_first_table, content, re.DOTALL)
+    if matches_for_first_table :
+        the_first_extracted_tuple = matches_for_first_table[0] # I may want to assert that there is only one element in this list (!)
+        keys_for_the_first_extracted_tuple = ("Drug Name", "Active Ingredients", "Strength", "Dosage Form/Route", "Marketing Status", "TE Code", "RLD", "RS")
+        application_data.update(dict(zip(keys_for_the_first_extracted_tuple, the_first_extracted_tuple)))
+    
+    ####################################
+    # Second HTML table
+    ####################################
+    
+    # ASSUMPTIONS: So we are assuming that we only have two (2) tr tags with no parameters (ie exactly like <tr>)
+    # Also, keep in mind : the last column (Url) is hidden !
+    regex_to_extract_data_from_second_table = '<tr>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*<td>(.*?)</td>\s*</tr>'
+    matches_for_second_table= re.findall(regex_to_extract_data_from_second_table, content, re.DOTALL)
+    # Only first list element is the table I need now, so I only consider the first one.
+    if matches_for_second_table :
+        the_second_extracted_tuple = matches_for_second_table[0]
+        # (An assertion must go here)
+        keys_for_the_second_extracted_tuple = ("Action Date", "Submission", "Action Type", "Submission Classification", "Review Priority; Orphan Status", "Letters, Reviews, Labels, Patient Package Insert", "Notes", "Url")
+        application_data.update(dict(zip(keys_for_the_second_extracted_tuple, the_second_extracted_tuple)))
+        application_data["Urls"] = application_data['Url'].split()
+        data['meta']['Columns']['Urls'] = 'This column is derived from the column Url.'
+
+
+    #for list_elem in matches :
+    #    if list_passed_validation_by_closing_td(list_elem) :
+    # A list of tuple was returned. If any of them has '</td>' then it's a wrong list
+
+    # In the following section I am extracting URLs for the cfm-files.
+    regex_to_match_a_URL = "(https://www.accessdata.fda.gov[^\s\"]+)[\s\"]"
+    matches_for_URLs = re.findall(regex_to_match_a_URL, content, re.DOTALL)
+    application_data["cfm_data"] = []
+    for n, item in enumerate(matches_for_URLs):
+        filename_extension = item.rsplit('.', 30)[-1]
+        if filename_extension == "cfm":
+            #application_data.update({"first_cfm_URL" : item})
+            application_data["cfm_data"].append({"URL" : item})
+    
+    data['Applications'].append(application_data)
+
+
+def scrap_one_letter_from_Drugs_at_FDA(alphabetLetter) :
+    now = datetime.now()
+    current_time = now.strftime("%H:%M:%S")
+    sys.stderr.write(alphabetLetter + " started. Current Time = " + current_time + ".     ")
+    alphabet_letter_url = 'https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm?event=browseByLetter.page&productLetter=' + alphabetLetter + '&ai=0'
+    with urlopen( alphabet_letter_url ) as webpage:
+        content = webpage.read().decode()
+        regex = '/scripts/cder/daf/index.cfm\?event\=overview\.process\&ApplNo\=(\d{6})'
+        ApplNumbers = re.findall(regex, content, re.DOTALL)
+        
+    application_basic_data = {"meta" : {'Columns' : { }}, "Applications" : [] }
+    sys.stderr.write("x 100 : ")
+    for n, ApplNo in enumerate(ApplNumbers):
+        if n % 100 == 0 :
+            sys.stderr.write(str(n // 100) + "")
+            sys.stderr.flush()
+            sys.stdout.flush()
+        elif n % 10 == 0 :
+            sys.stderr.write(".")
+            sys.stderr.flush()
+        make_a_random_pause()
+        scrap_one_application_from_Drugs_at_FDA(application_basic_data, ApplNo, alphabetLetter)
+        if n > 150 :
+           break
+    sys.stderr.write(".\n")
+    json_file = open("json_" + alphabetLetter + ".txt", "w")
+    n = json_file.write(json.dumps(application_basic_data))
+    json_file.close()
+
+def scrap_whole_alphabet_from_Drugs_at_FDA() :
+    for ascii_code in range(65, 91):
+        alphabetLetter = chr(ascii_code)
+        scrap_one_letter_from_Drugs_at_FDA(alphabetLetter)
