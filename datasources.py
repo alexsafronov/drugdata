@@ -668,8 +668,8 @@ def scrap_one_letter_from_Drugs_at_FDA(alphabetLetter, slicing_limits_per_letter
     json_file.close()
 
 def scrap_whole_alphabet_from_Drugs_at_FDA(slicing_limits_per_letter=(None, None)) :
-    ascii_code_for_A = 65
-    ascii_code_for_Z = 91
-    for ascii_code in range(ascii_code_for_A, ascii_code_for_Z):
+    ascii_code_at_A = 65
+    ascii_code_after_Z = 91
+    for ascii_code in range(ascii_code_at_A, ascii_code_after_Z):
         alphabetLetter = chr(ascii_code)
         scrap_one_letter_from_Drugs_at_FDA(alphabetLetter, slicing_limits_per_letter = slicing_limits_per_letter)
