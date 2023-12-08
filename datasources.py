@@ -638,7 +638,7 @@ def scrap_one_application_from_Drugs_at_FDA(data, ApplNo, alphabetLetter) :
     data['Applications'].append(application_data)
 
 
-def scrap_one_letter_from_Drugs_at_FDA(alphabetLetter) :
+def scrap_one_letter_from_Drugs_at_FDA(alphabetLetter, slicing_limits_per_letter=(None, None)) :
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
     sys.stderr.write(alphabetLetter + " started. Current Time = " + current_time + ".     ")
@@ -650,7 +650,7 @@ def scrap_one_letter_from_Drugs_at_FDA(alphabetLetter) :
         
     application_basic_data = {"meta" : {'Columns' : { }}, "Applications" : [] }
     sys.stderr.write("x 100 : ")
-    for n, ApplNo in enumerate(ApplNumbers):
+    for n, ApplNo in enumerate(ApplNumbers[slicing_limits_per_letter[0]: slicing_limits_per_letter[1]]):
         if n % 100 == 0 :
             sys.stderr.write(str(n // 100) + "")
             sys.stderr.flush()
@@ -660,14 +660,16 @@ def scrap_one_letter_from_Drugs_at_FDA(alphabetLetter) :
             sys.stderr.flush()
         make_a_random_pause()
         scrap_one_application_from_Drugs_at_FDA(application_basic_data, ApplNo, alphabetLetter)
-        if n > 150 :
-           break
+        # if n > 150 :
+        #   break
     sys.stderr.write(".\n")
     json_file = open("json_" + alphabetLetter + ".txt", "w")
     n = json_file.write(json.dumps(application_basic_data))
     json_file.close()
 
-def scrap_whole_alphabet_from_Drugs_at_FDA() :
-    for ascii_code in range(65, 91):
+def scrap_whole_alphabet_from_Drugs_at_FDA(slicing_limits_per_letter=(None, None)) :
+    ascii_code_for_A = 65
+    ascii_code_for_Z = 91
+    for ascii_code in range(ascii_code_for_A, ascii_code_for_Z):
         alphabetLetter = chr(ascii_code)
-        scrap_one_letter_from_Drugs_at_FDA(alphabetLetter)
+        scrap_one_letter_from_Drugs_at_FDA(alphabetLetter, slicing_limits_per_letter = slicing_limits_per_letter)
