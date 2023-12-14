@@ -9,7 +9,10 @@ from operator import itemgetter
 from urllib.request import urlopen
 
 label_data_path = None
-
+ct_data_path_extracted = None
+emtree_nodes_w_unique_terms_indic_path_fn = None
+label_subselected_path_fn = None
+staging_path = None
 
 def config(fn) :
     config_data = json.load(open(fn, "r"))
@@ -34,7 +37,13 @@ def config(fn) :
         global ct_data_path_extracted
         ct_data_path_extracted    = os.path.join(config_data['base_path'], config_data['ct_data_path_extracted'])
         
+        global emtree_nodes_w_unique_terms_indic_path_fn
+        emtree_nodes_w_unique_terms_indic_path_fn    = os.path.join(config_data['base_path'], config_data['emtree_nodes_w_unique_terms_indic_path_fn'])
+        
         staging_path    = os.path.join(config_data['base_path'], config_data['staging_dir'])
+        
+        global label_subselected_path_fn
+        label_subselected_path_fn    = os.path.join(config_data['base_path'], config_data['label_subselected_path_fn'])
         
         global emtree_indic_data_path_fn
         emtree_indic_data_path_fn    = os.path.join(config_data['base_path'], config_data['emtree_indic_data_path_fn'])
