@@ -13,6 +13,7 @@ ct_data_path_extracted = None
 emtree_nodes_w_unique_terms_indic_path_fn = None
 label_subselected_path_fn = None
 staging_path = None
+verbatim_synonyms_matched_labels_fn = None
 
 def config(fn) :
     config_data = json.load(open(fn, "r"))
@@ -57,6 +58,9 @@ def config(fn) :
         
         global fda_master_appl_data_html_source_path
         fda_master_appl_data_html_source_path    = os.path.join(config_data['base_path'], config_data['fda_master_appl_data_html_source_path'])
+        
+        global verbatim_synonyms_matched_labels_fn
+        verbatim_synonyms_matched_labels_fn    = os.path.join(staging_path, config_data['verbatim_synonyms_matched_labels_fn'])
     else :
         label_data_path = config_data['label_data_path']
         ct_data_path    = config_data['ct_data_path']
