@@ -66,7 +66,7 @@ components[1] = "For example: [5, 6, 7, 8]. "
 components[2] = "Make sure to only include the indices for medical conditions for which the drug is indicated. "
 components[3] = "If a medical condition is not indicated according to the label, then do not include it in the list. "
 
-json_file = open(ds.verbatim_synonyms_matched_labels_fn, "r")
+json_file = open(ds.verbatim_synonyms_matched_labels, "r")
 # json_file = open(os.path.join(ds.staging_path, "verbatim_synonyms_matched_labels_2023_12_14.json"), "r")
 json_obj = json.load(json_file)
 
@@ -81,13 +81,14 @@ def one_query(index) :
             "Please give me a comma-separated list of the corresponding indices from 0 to " + str(len(numbered_conditions)-1) + \
             ", enclosed in square brackets, of the conditions which are indicated according to the drug label I will provide. " + \
             components[0] + components[1] + components[2] + components[3] + \
-            "Here is the drug label: " + context + ""
+            "\n\nHere is the drug label: " + context + ""
     return(query)
-    
-ds.config("ddconfig.json")
-print(ds.label_data_path)
 
-for idx in range(4, 5):
-    print(one_query(idx), "\n\n")
+def get_sequence_of_queries(slicing_limits=(None, None)) :
+    ret = []
+    for idx in range(slicing_limits[0], slicing_limits[1]):
+        ret.append(one_query(idx))
+    return(ret)
+
 
 
