@@ -69,14 +69,13 @@ components[3] = "If a medical condition is not indicated according to the label,
 json_file = open(ds.verbatim_synonyms_matched_labels, "r")
 # json_file = open(os.path.join(ds.staging_path, "verbatim_synonyms_matched_labels_2023_12_14.json"), "r")
 json_obj = json.load(json_file)
+total_record_count = len(json_obj)
+print(f"There are a total of {total_record_count} records loaded.")
 
-def one_query(index) :
-    context = json_obj[index]['indications_and_usage']
-    conditions = json_obj[index]['verbatim_emtree_matches']
+def one_query(conditions, context) :
     numbered_conditions = []
     for idx, condition in enumerate(conditions) :
         numbered_conditions.append( str(idx) + ": " + condition)
-    # conditions.append(context)
     query = "The following is an ordered list of the medical conditions: " + ", ".join(numbered_conditions) + ". " + \
             "Please give me a comma-separated list of the corresponding indices from 0 to " + str(len(numbered_conditions)-1) + \
             ", enclosed in square brackets, of the conditions which are indicated according to the drug label I will provide. " + \
@@ -87,8 +86,10 @@ def one_query(index) :
 # def get_sequence_of_queries(slicing_limits=(None, None)) :
 def get_sequence_of_query_objects(slicing_limits=(None, None)) :
     ret = []
-    for idx in range(slicing_limits[0], slicing_limits[1]):
-        ret.append( {'pregenerated_query' : one_query(idx) } )
+    for one_json_object in json_obj[slicing_limits[0] : slicing_limits[1]] : # range(slicing_limits[0], slicing_limits[1]):
+        context = one_json_object['indications_and_usage']
+        conditions = one_json_object['verbatim_emtree_matches']
+        ret.append( {'pregenerated_query' : one_query(conditions, context) } )
     return(ret)
 
 
