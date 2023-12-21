@@ -84,10 +84,11 @@ def one_query(index) :
             "\n\nHere is the drug label: " + context + ""
     return(query)
 
-def get_sequence_of_queries(slicing_limits=(None, None)) :
+# def get_sequence_of_queries(slicing_limits=(None, None)) :
+def get_sequence_of_query_objects(slicing_limits=(None, None)) :
     ret = []
     for idx in range(slicing_limits[0], slicing_limits[1]):
-        ret.append(one_query(idx))
+        ret.append( {'pregenerated_query' : one_query(idx) } )
     return(ret)
 
 
