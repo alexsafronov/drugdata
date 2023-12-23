@@ -55,7 +55,6 @@ import sys, os, json
 sys.path.append(r"C:\py\drugdata")
 import datasources as ds
 import ctinversion as cti
-import synmatching as synm
 
 
 # The example query: 
@@ -66,11 +65,31 @@ components[1] = "For example: [5, 6, 7, 8]. "
 components[2] = "Make sure to only include the indices for medical conditions for which the drug is indicated. "
 components[3] = "If a medical condition is not indicated according to the label, then do not include it in the list. "
 
-json_file = open(ds.verbatim_synonyms_matched_labels, "r")
-# json_file = open(os.path.join(ds.staging_path, "verbatim_synonyms_matched_labels_2023_12_14.json"), "r")
-json_obj = json.load(json_file)
-total_record_count = len(json_obj)
-print(f"There are a total of {total_record_count} records loaded.")
+# Uniform design produces the same set of prompts for each context
+
+uniform_design_pattern = [
+	[1, 0, 0, 0],
+	[1, 1, 0, 0],
+	[1, 0, 1, 0],
+	[1, 0, 0, 1],
+	[1, 1, 1, 0],
+	[1, 1, 0, 1],
+	[1, 0, 1, 1],
+	[1, 1, 1, 1]
+]
+
+def generate_uniform_design(context_count, design_pattern) :
+	design_matrix = []
+	for context_id in range (0, context_count) :
+		for pattern_element in design_pattern :
+			design_element = []
+			design_element.append(context_id)
+			design_element += pattern_element
+			design_matrix.append(design_element)
+	return(design_matrix)
+	
+des_matr = generate_uniform_design(2, uniform_design_pattern)
+print(des_matr)
 
 def one_query(conditions, context) :
     numbered_conditions = []
@@ -83,14 +102,19 @@ def one_query(conditions, context) :
             "\n\nHere is the drug label: " + context + ""
     return(query)
 
-# def get_sequence_of_queries(slicing_limits=(None, None)) :
 def get_sequence_of_query_objects(slicing_limits=(None, None)) :
-    ret = []
-    for one_json_object in json_obj[slicing_limits[0] : slicing_limits[1]] : # range(slicing_limits[0], slicing_limits[1]):
-        context = one_json_object['indications_and_usage']
-        conditions = one_json_object['verbatim_emtree_matches']
-        ret.append( {'pregenerated_query' : one_query(conditions, context) } )
-    return(ret)
+	json_file = open("../verbatim_synonyms_matched_labels.json", "r")
+	# json_file = open(os.path.join(ds.staging_path, "verbatim_synonyms_matched_labels_2023_12_14.json"), "r")
+	json_obj = json.load(json_file)
+	total_record_count = len(json_obj)
+	print(f"There are a total of {total_record_count} records loaded.")
+	
+	ret = []
+	for one_json_object in json_obj[slicing_limits[0] : slicing_limits[1]] : # range(slicing_limits[0], slicing_limits[1]):
+		context = one_json_object['indications_and_usage']
+		conditions = one_json_object['verbatim_emtree_matches']
+		ret.append( {'pregenerated_query' : one_query(conditions, context) } )
+	return(ret)
 
 
 
