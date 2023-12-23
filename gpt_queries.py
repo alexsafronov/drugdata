@@ -59,7 +59,7 @@ import ctinversion as cti
 
 # The example query: 
 
-components = [None] * 5
+components = [None] * 4
 components[0] = "Please only return the comma-separated list of the corresponding indices enclosed in square brackets without explaining what you are doing. "
 components[1] = "For example: [5, 6, 7, 8]. "
 components[2] = "Make sure to only include the indices for medical conditions for which the drug is indicated. "
@@ -88,8 +88,8 @@ def generate_uniform_design(context_count, design_pattern) :
 			design_matrix.append(design_element)
 	return(design_matrix)
 	
-des_matr = generate_uniform_design(2, uniform_design_pattern)
-print(des_matr)
+# des_matr = generate_uniform_design(4, uniform_design_pattern)
+
 
 def one_query(conditions, context) :
     numbered_conditions = []
@@ -102,6 +102,28 @@ def one_query(conditions, context) :
             "\n\nHere is the drug label: " + context + ""
     return(query)
 
+def one_designer_query(conditions, context, design_element) :
+	global components
+	numbered_conditions = []
+	for idx, condition in enumerate(conditions) :
+		numbered_conditions.append( str(idx) + ": " + condition)
+	query = "The following is an ordered list of the medical conditions: " + ", ".join(numbered_conditions) + ". " + \
+	"Please give me a comma-separated list of the corresponding indices from 0 to " + str(len(numbered_conditions)-1) + \
+	", enclosed in square brackets, of the conditions which are indicated according to the drug label I will provide. "
+	print(design_element)
+	for counter, design_bit in enumerate(design_element) :
+		if bool( design_bit ) :
+			query += components[counter-1]
+	query += "\n\nHere is the drug label: " + context + ""
+
+	return(query)
+	# components[0] + components[1] + components[2] + components[3] + 
+	# print("design_element =", design_element)
+
+'''
+'''
+
+
 def get_sequence_of_query_objects(slicing_limits=(None, None)) :
 	json_file = open("../verbatim_synonyms_matched_labels.json", "r")
 	# json_file = open(os.path.join(ds.staging_path, "verbatim_synonyms_matched_labels_2023_12_14.json"), "r")
@@ -109,12 +131,23 @@ def get_sequence_of_query_objects(slicing_limits=(None, None)) :
 	total_record_count = len(json_obj)
 	print(f"There are a total of {total_record_count} records loaded.")
 	
+	selected_json_objects = json_obj[slicing_limits[0] : slicing_limits[1]]
+	design_matrix = generate_uniform_design(len(selected_json_objects), uniform_design_pattern)
+	
 	ret = []
-	for one_json_object in json_obj[slicing_limits[0] : slicing_limits[1]] : # range(slicing_limits[0], slicing_limits[1]):
+	for counter, one_json_object in enumerate(selected_json_objects) : # range(slicing_limits[0], slicing_limits[1]):
 		context = one_json_object['indications_and_usage']
 		conditions = one_json_object['verbatim_emtree_matches']
-		ret.append( {'pregenerated_query' : one_query(conditions, context) } )
+		# ret.append( {'pregenerated_query' : one_query(conditions, context) } )
+		# design_element = design_matrix[counter]
+		print(len(design_matrix))
+		# for idx in range(0, 1) :
+		for design_element in design_matrix :
+			# ret.append( {'pregenerated_query' : one_designer_query(conditions, context, my_desma) } )
+			# design_element = design_matrix[idx]
+			ret.append( {'pregenerated_query' : one_designer_query(conditions, context, design_element) } )
 	return(ret)
 
+json.dump(get_sequence_of_query_objects(slicing_limits=(49, 56)), open("small_query_seq.json", "w"))
 
 
