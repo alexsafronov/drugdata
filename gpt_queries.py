@@ -112,17 +112,11 @@ def one_designer_query(conditions, context, design_element) :
 	", enclosed in square brackets, of the conditions which are indicated according to the drug label I will provide. "
 	print(design_element)
 	for counter, design_bit in enumerate(design_element) :
-		if bool( design_bit ) :
+		if counter > 0 and bool( design_bit ) :
 			query += components[counter-1]
 	query += "\n\nHere is the drug label: " + context + ""
 
 	return(query)
-	# components[0] + components[1] + components[2] + components[3] + 
-	# print("design_element =", design_element)
-
-'''
-'''
-
 
 def get_sequence_of_query_objects(slicing_limits=(None, None)) :
 	json_file = open("../verbatim_synonyms_matched_labels.json", "r")
@@ -135,19 +129,22 @@ def get_sequence_of_query_objects(slicing_limits=(None, None)) :
 	design_matrix = generate_uniform_design(len(selected_json_objects), uniform_design_pattern)
 	
 	ret = []
-	for counter, one_json_object in enumerate(selected_json_objects) : # range(slicing_limits[0], slicing_limits[1]):
+	print(len(design_matrix))
+	for query_id, design_element in enumerate(design_matrix) :
+		context_id = design_element[0]
+		one_json_object = selected_json_objects[context_id]
 		context = one_json_object['indications_and_usage']
 		conditions = one_json_object['verbatim_emtree_matches']
-		# ret.append( {'pregenerated_query' : one_query(conditions, context) } )
-		# design_element = design_matrix[counter]
-		print(len(design_matrix))
-		# for idx in range(0, 1) :
-		for design_element in design_matrix :
-			# ret.append( {'pregenerated_query' : one_designer_query(conditions, context, my_desma) } )
-			# design_element = design_matrix[idx]
-			ret.append( {'pregenerated_query' : one_designer_query(conditions, context, design_element) } )
+		designer_query = one_designer_query(conditions, context, design_element)
+		ret.append( {
+			'pregenerated_query' : designer_query,
+			'design_element' : design_element,
+			'context_id' : context_id,
+			'synonym_count' : len(conditions),
+			'query_id' : query_id
+		} )
 	return(ret)
 
-json.dump(get_sequence_of_query_objects(slicing_limits=(49, 56)), open("small_query_seq.json", "w"))
+json.dump(get_sequence_of_query_objects(slicing_limits=(49, 52)), open("small_query_seq.json", "w"))
 
 
